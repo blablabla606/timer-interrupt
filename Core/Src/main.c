@@ -31,6 +31,106 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define D4_PORT GPIOB
+#define D4_PIN  GPIO_PIN_4
+
+#define D5_PORT GPIOB
+#define D5_PIN  GPIO_PIN_5
+
+#define D4_ON()  HAL_GPIO_WritePin(D4_PORT, D4_PIN, GPIO_PIN_SET)
+#define D4_OFF() HAL_GPIO_WritePin(D4_PORT, D4_PIN, GPIO_PIN_RESET)
+
+#define D5_ON()  HAL_GPIO_WritePin(D5_PORT, D5_PIN, GPIO_PIN_SET)
+#define D5_OFF() HAL_GPIO_WritePin(D5_PORT, D5_PIN, GPIO_PIN_RESET)
+
+void process1_run();
+void process4_run();
+
+
+typedef enum {
+    PROCESS_1,
+    PROCESS_4,
+} ProcessType;
+
+void process1_run()
+{
+    switch (step)
+    {
+        case 0:
+            D4_ON(); D5_ON();
+            break;
+
+        case 1:
+            D4_OFF(); D5_OFF();
+            break;
+
+        case 2:
+            D4_ON(); D5_OFF();
+            break;
+
+        case 3:
+            D4_OFF(); D5_ON();
+            break;
+
+        case 4:
+            D4_ON(); D5_ON();
+            break;
+
+        default:
+            step = 0;
+            return;
+    }
+
+    step++;
+}
+
+void process4_run()
+{
+    switch (step)
+    {
+        // lặp 3 lần
+        case 0:
+        case 2:
+        case 4:
+            D4_ON(); D5_OFF();
+            break;
+
+        case 1:
+        case 3:
+        case 5:
+            D4_ON(); D5_ON();
+            break;
+
+        // delay 2s (4 * 0.5s)
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+            D4_OFF(); D5_OFF();
+            break;
+
+        // cuối
+        case 10:
+            D4_OFF(); D5_ON();
+            break;
+
+        case 11:
+            D4_ON(); D5_ON();
+            break;
+
+        default:
+            step = 0;
+            return;
+    }
+
+    step++;
+}
+
+
+
+// debounce
+uint8_t lastButtonState = 1;
+uint32_t lastDebounceTime = 0;
 
 /* USER CODE END PD */
 
@@ -43,7 +143,9 @@
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
-
+volatile ProcessType currentProcess = PROCESS_1;
+volatile uint8_t step = 0;
+volatile uint8_t loop_count = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,7 +202,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  }
+
   /* USER CODE END 3 */
 }
 
@@ -159,9 +261,9 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 7999;
+  htim2.Init.Prescaler = 3999;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 9;
+  htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -201,10 +303,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_10, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1|GPIO_PIN_4|GPIO_PIN_5, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA10 */
-  GPIO_InitStruct.Pin = GPIO_PIN_10;
+  /*Configure GPIO pins : PA1 PA4 PA5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1|GPIO_PIN_4|GPIO_PIN_5;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -216,16 +318,22 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-counter = 100;
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-	if(counter > 0){
-		counter --;
-		if(counter <= 0){
-			counter = 20;
-			HAL_GPIO_TogglePin(GPIOA,GPIO_PIN_10);
-		}
-	}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM2)
+    {
+        switch (currentProcess)
+        {
+            case PROCESS_1:
+                process1_run();
+                break;
+
+            case PROCESS_4:
+                process4_run();
+                break;
+        }
+    }
 }
 
 /* USER CODE END 4 */
